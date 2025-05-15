@@ -6,7 +6,7 @@
 #include <ArduinoJson.h>
 
 #define LORA_BAND 868.0
-#define LORA_SPI SPI // Explicitly use the SPI bus
+#define LORA_SPI SPI
 
 class CommunicationManager
 {

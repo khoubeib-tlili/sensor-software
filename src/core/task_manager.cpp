@@ -12,13 +12,13 @@ bool CommunicationManager::begin()
     if (state != RADIOLIB_ERR_NONE)
         return false;
 
-    radio.setDio0Action([]() { /* ISR handler */ });
+    // radio.setDio0Action([]() { /* ISR handler */ });
 
     // Initialize WiFi
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    // WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     // Initialize MQTT
-    mqttClient.setServer(MQTT_SERVER, 1883);
+    // mqttClient.setServer(MQTT_SERVER, 1883);
     return true;
 }
 
