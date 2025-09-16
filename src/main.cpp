@@ -1,64 +1,42 @@
 #include <WiFi.h>
-#include <PubSubClient.h>
-#include <Arduino.h>
-#include "Network/WiFiManager.h"   // Your Wi-Fi manager class
-#include "Network/MQTTManager.h"   // Your MQTT manager class
+#include "Utilities/TimeManager.h"
 
-// ===== MQTT Broker Credentials =====
-const char* mqtt_server     = "rq-poc.water-sec.com";
-const int   mqtt_port       = 1883;  // default MQTT port
-const char* mqtt_user       = "test";
-const char* mqtt_pass       = "Test123!";
-const char* subscribe_topic = "esp32/test";
+const char* ssid = "khaled";
+const char* password = "khaled000";
 
-// Wi-Fi and MQTT objects
-WiFiManager wifiManager;
-WiFiClient espClient;
-PubSubClient client(espClient);
-MQTTManager mqttManager(client);
-
-// Callback for incoming MQTT messages
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    Serial.print("Message arrived on topic: ");
-    Serial.println(topic);
-    Serial.print("Payload: ");
-    for (unsigned int i = 0; i < length; i++) {
-        Serial.print((char)payload[i]);
-    }
-    Serial.println();
-}
+// NTP server, offset in seconds (3600 = UTC+1), update interval (ms)
+TimeManager timeMgr("pool.ntp.org", 3600, 60 * 1000);
 
 void setup() {
-    Serial.begin(115200);
-    delay(1000);
-    Serial.println("Starting ESP32 Wi-Fi + MQTT Test...");
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
 
-    // ===== Connect to Wi-Fi using WiFiManager =====
-    const char* ssid = "khaled";       // your Wi-Fi SSID
-    const char* password = "khaled000"; // your Wi-Fi password
-    wifiManager.init(ssid, password);
-
-    // ===== Initialize MQTT =====
-    mqttManager.setCallback(mqttCallback);
-    mqttManager.init(mqtt_server, mqtt_port, "ESP32Client", mqtt_user, mqtt_pass, subscribe_topic);
+  timeMgr.begin();
 }
 
 void loop() {
-    // Maintain MQTT connection
-    if (!mqttManager.isConnected()) {
-        Serial.println("MQTT disconnected, attempting to reconnect...");
-        mqttManager.reconnect("ESP32Client", mqtt_user, mqtt_pass, subscribe_topic);
-    }
+  timeMgr.update();
 
-    mqttManager.loop();
+  // current date/time
+  auto dt = timeMgr.getCurrentDateTime();
+  Serial.printf("%04d-%02d-%02d %02d:%02d:%02d\n",
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second);
 
-    // Publish a test message every 5 seconds
-    static unsigned long lastPublish = 0;
-    if (millis() - lastPublish > 5000) {
-        const char* testMsg = "Hello from ESP32!";
-        Serial.print("Publishing: ");
-        Serial.println(testMsg);
-        mqttManager.publish("esp32/test", testMsg);
-        lastPublish = millis();
-    }
+  // raw timestamp
+  uint32_t ts = timeMgr.getTimestamp();
+  Serial.print("Epoch timestamp: ");
+  Serial.println(ts);
+
+  // convert millis to human readable period
+  String uptime = timeMgr.millisToPeriod(millis());
+  Serial.print("Uptime: ");
+  Serial.println(uptime);
+
+  delay(2000);
 }
