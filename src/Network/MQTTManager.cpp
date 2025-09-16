@@ -16,13 +16,13 @@ void MQTTManager::init(const char* server, int port, const char* gw_name,
     bool connected = false;
     while (trialCount < 3) {
         if (_client.connect(gw_name, user, pass)) {
-            // _logs.addElementToFile("MQTT", "Connected to broker");
+            addElementToFile("MQTT", "Connected to broker");
             // _errorMgr.logInfo("MQTT connected");
             Serial.println("MQTT connected to broker");
             connected = true;
             break;
         } else {
-            // _logs.addElementToFile("MQTT", "Connecting to MQTT failed");
+            addElementToFile("MQTT", "Connecting to MQTT failed");
             // _errorMgr.logWarning("MQTT connection failed");
             Serial.print("MQTT connection attempt ");
             Serial.print(trialCount + 1);
@@ -33,13 +33,13 @@ void MQTTManager::init(const char* server, int port, const char* gw_name,
     }
     if (connected) {
         if (_client.subscribe(subscribeQueue, 1)) {
-            // _logs.addElementToFile("MQTT", "Subscribed to topic");
+            addElementToFile("MQTT", "Subscribed to topic");
             char msg[128];
             snprintf(msg, sizeof(msg), "Subscribed to topic: %s", subscribeQueue);
             // _errorMgr.logInfo(msg);
             Serial.println(msg);
         } else {
-            // _logs.addElementToFile("MQTT", "Subscription failed");
+            addElementToFile("MQTT", "Subscription failed");
             // _errorMgr.logError("MQTT subscription failed");
             Serial.print("MQTT subscription failed for topic: ");
             Serial.println(subscribeQueue);
@@ -52,12 +52,12 @@ void MQTTManager::reconnect(const char* gw_name, const char* user, const char* p
     int trials = 0, trialsSub = 0;
     while (!_client.connected() && trials < 2) {
         if (_client.connect(gw_name, user, pass)) {
-            // _logs.addElementToFile("MQTT", "Reconnected to broker");
+            addElementToFile("MQTT", "Reconnected to broker");
             // _errorMgr.logInfo("MQTT reconnected");
             Serial.println("MQTT reconnected to broker");
             break;
         } else {
-            // _logs.addElementToFile("MQTT", "MQTT reconnect failed");
+            addElementToFile("MQTT", "MQTT reconnect failed");
             // _errorMgr.logWarning("MQTT reconnect failed");
             Serial.print("MQTT reconnect attempt ");
             Serial.print(trials + 1);
@@ -68,14 +68,14 @@ void MQTTManager::reconnect(const char* gw_name, const char* user, const char* p
     }
     while (trialsSub < 2) {
         if (_client.subscribe(subscribeQueue, 1)) {
-            // _logs.addElementToFile("MQTT", "Subscribed to topic after reconnect");
+            addElementToFile("MQTT", "Subscribed to topic after reconnect");
             char msg[128];
             snprintf(msg, sizeof(msg), "Subscribed to topic after reconnect: %s", subscribeQueue);
             // _errorMgr.logInfo(msg);
             Serial.println(msg);
             break;
         } else {
-            // _logs.addElementToFile("MQTT", "MQTT subscribe failed after reconnect");
+            addElementToFile("MQTT", "MQTT subscribe failed after reconnect");
             // _errorMgr.logError("MQTT subscribe failed after reconnect");
             Serial.print("MQTT subscription after reconnect failed for topic: ");
             Serial.println(subscribeQueue);
@@ -103,14 +103,14 @@ bool MQTTManager::publish(const char* topic, const char* payload, size_t length)
     char msg[128];
     if (result) {
         snprintf(msg, sizeof(msg), "Published to %s", topic);
-        // _logs.addElementToFile("MQTT", msg);
+        addElementToFile("MQTT", msg);
 
         snprintf(msg, sizeof(msg), "MQTT published to: %s", topic);
         // _errorMgr.logInfo(msg);
         Serial.println(msg);
     } else {
         snprintf(msg, sizeof(msg), "Publish failed to %s", topic);
-        // _logs.addElementToFile("MQTT", msg);
+        addElementToFile("MQTT", msg);
 
         snprintf(msg, sizeof(msg), "MQTT publish failed to: %s", topic);
         // _errorMgr.logError(msg);
@@ -124,14 +124,14 @@ bool MQTTManager::subscribe(const char* topic, uint8_t qos) {
     char msg[128];
     if (result) {
         snprintf(msg, sizeof(msg), "Subscribed to %s", topic);
-        // _logs.addElementToFile("MQTT", msg);
+        addElementToFile("MQTT", msg);
 
         snprintf(msg, sizeof(msg), "MQTT subscribed to: %s", topic);
         // _errorMgr.logInfo(msg);
         Serial.println(msg);
     } else {
         snprintf(msg, sizeof(msg), "Subscribe failed to %s", topic);
-        // _logs.addElementToFile("MQTT", msg);
+        addElementToFile("MQTT", msg);
 
         snprintf(msg, sizeof(msg), "MQTT subscribe failed to: %s", topic);
         // _errorMgr.logError(msg);
@@ -147,7 +147,7 @@ void MQTTManager::loop() {
 void MQTTManager::logMQTTError(const String& context, int code) {
     char msg[128];
     snprintf(msg, sizeof(msg), "%s failed, code: %d", context.c_str(), code);
-    // _logs.addElementToFile("MQTTError", msg);
+    addElementToFile("MQTTError", msg);
     // _errorMgr.logError(msg);
     Serial.print("[MQTT ERROR] ");
     Serial.println(msg);
