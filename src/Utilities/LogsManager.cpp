@@ -19,7 +19,7 @@ static void printToSerial(const char* element, const char* value) {
     Serial.println(value);
     return;
   }
-  TimeManager::DateTime date = g_timeMgr->getCurrentDateTime();
+  TimeManager::DateTimeInfo date = g_timeMgr->getCurrentDateTime();
   Serial.printf("%02d-%02d-%02dT%02d:%02d:%02d %s \"%s\" %s\n",
                 date.year, date.month, date.day,
                 date.hour, date.minute, date.second,
@@ -38,7 +38,7 @@ void addElementToFile(const char* element, const char* value="") {
     return;
   }
 
-  TimeManager::DateTime date = g_timeMgr->getCurrentDateTime();
+  TimeManager::DateTimeInfo date = g_timeMgr->getCurrentDateTime();
   char fileName[32];
   snprintf(fileName, sizeof(fileName),
            "%02d_%02d_%02d_LogFile.txt",
@@ -81,7 +81,7 @@ void addLogLineToFile(const char* element) {
     return;
   }
 
-  TimeManager::DateTime date = g_timeMgr->getCurrentDateTime();
+  TimeManager::DateTimeInfo date = g_timeMgr->getCurrentDateTime();
   char fileName[32];
   snprintf(fileName, sizeof(fileName),
            "%02d_%02d_%02d_PrGwLF.txt",

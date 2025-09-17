@@ -1,120 +1,72 @@
 #include <Arduino.h>
-#include <SPI.h>
-#include "Storage/SDManager.h"
-#include "Storage/DatabaseManager.h"
-
-// --- SD Pins ---
-#define SCK_SD  18
-#define MISO_SD 19
-#define MOSI_SD 23
-#define CS_SD   5
-
-// --- SPI bus for SD ---
-SPIClass spiSD(VSPI); // we’ll set pins in begin()
-
-// --- Managers ---
-SDManager sdManager(CS_SD, spiSD, 4000000);  // 4 MHz
-DatabaseManager* dbManager = nullptr;
-
-// --- callback for SELECT queries ---
-static int selectCallback(void* data, int argc, char** argv, char** azColName) {
-  Serial.println("Row:");
-  for (int i = 0; i < argc; i++) {
-    Serial.printf("  %s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-  }
-  return 0;
-}
-
-#include <WiFi.h>
+#include <Wire.h>
+#include "Network/WiFiManager.h"
 #include "Utilities/TimeManager.h"
 
+// ---- Your WiFi credentials ----
 const char* ssid = "khaled";
 const char* password = "khaled000";
 
-// NTP server, offset in seconds (3600 = UTC+1), update interval (ms)
-TimeManager timeMgr("pool.ntp.org", 3600, 60 * 1000);
+// ---- WiFi Manager ----
+WiFiManager wifiMgr;
 
+// ---- I2C pins for RTC ----
+#define SDA_PIN 18
+#define SCL_PIN 19
 
+// ---- Time Manager ----
+// Parameters: NTP server, UTC offset (3600 = 1h), NTP interval (60000ms), sync interval (10000ms),
+// WiFi manager pointer, useRTC = true, SDA/SCL pins
+
+TimeManager* timeMgr;
 void setup() {
   Serial.begin(115200);
-  delay(2000);
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected");
+  Serial.println("\n--- TimeManager Test ---");
 
-  timeMgr.begin();
-  timeMgr.update();
+  // init WiFi
+  wifiMgr.init(ssid, password);
 
-  Serial.println("=== SD + SQLite Test ===");
+  // init time manager (starts NTP + RTC)
+  timeMgr = new TimeManager("pool.ntp.org", 3600, 60000, 10000, &wifiMgr, true, SDA_PIN, SCL_PIN);
+  timeMgr->begin();
 
-  // Configure SPI pins
-  spiSD.begin(SCK_SD, MISO_SD, MOSI_SD, CS_SD);
-  Logs_init(sdManager, timeMgr);
+  // test changing sync interval
+  Serial.println("Changing sync interval to 5 seconds...");
+  timeMgr->setSyncInterval(5000);
 
-  // 1) Init SD
-  if (!sdManager.init()) {
-    Serial.println("Failed to init SD!");
-    while (1) delay(100);
-  }
-  Serial.println("SD mounted successfully");
-   
-
-  // 2) Test plain SD file write/read
-  File f = sdManager.open("/test.txt", "a");
-  if (f) {
-    f.println("Hello from ESP32!");
-    f.close();
-    Serial.println("Wrote test.txt on SD");
-  }
-
-  f = sdManager.open("/test.txt", "r");
-  if (f) {
-    Serial.println("Contents of test.txt:");
-    while (f.available()) {
-      Serial.write(f.read());
-    }
-    f.close();
-  }
-
-  // 3) Create Database on SD
-  dbManager = new DatabaseManager("/sd/test.db"); // path relative to SD
-  if (!dbManager->open()) {
-    Serial.println("Failed to open DB!");
-    while (1) delay(100);
-  }
-  Serial.println("Database opened successfully");
-
-  // Create a table
-  const char* createTableSQL =
-      "CREATE TABLE IF NOT EXISTS test_table (id INTEGER PRIMARY KEY, name TEXT);";
-  if (!dbManager->createTable(createTableSQL)) {
-    Serial.println("Failed to create table!");
-  } else {
-    Serial.println("Table created OK");
-  }
-
-  // Insert some data
-  const char* insertSQL = "INSERT INTO test_table (name) VALUES ('ESP32');";
-  if (!dbManager->exec(insertSQL)) {
-    Serial.println("Insert failed");
-  } else {
-    Serial.println("Inserted record");
-  }
-
-  // Select data
-  const char* selectSQL = "SELECT * FROM test_table;";
-  Serial.println("Querying records:");
-  dbManager->exec(selectSQL, selectCallback, nullptr);
-
-  // Close DB
-  dbManager->close();
-  Serial.println("DB closed");
+  // Force a sync immediately
+  Serial.println("Forcing NTP sync now...");
+  timeMgr->forceSync();
 }
 
 void loop() {
-  // Nothing to do
+  // // call update to perform periodic sync
+  timeMgr->update();
+
+  // test getTimestamp()
+  unsigned long ts = timeMgr->getTimestamp();
+  Serial.print("Timestamp: ");
+  Serial.println(ts);
+
+  // test getCurrentDateTime()
+  TimeManager::DateTimeInfo dt = timeMgr->getCurrentDateTime();
+  Serial.printf("Current DateTime: %04d-%02d-%02d %02d:%02d:%02d\n",
+                dt.year, dt.month, dt.day,
+                dt.hour, dt.minute, dt.second);
+
+  // test millisToPeriod()
+  String period = timeMgr->millisToPeriod(millis());
+  Serial.print("Millis since boot = ");
+  Serial.println(period);
+
+  // Wait 1 second
+  delay(1000);
+
+  // After a few loops, test forceSync again
+  static unsigned long lastForce = 0;
+  if (millis() - lastForce > 30000) { // every 30s
+    Serial.println("Forcing NTP sync again...");
+    timeMgr->forceSync();
+    lastForce = millis();
+  }
 }

@@ -13,8 +13,4 @@ public:
     bool isConnected();
     IPAddress getLocalIP();
 
-private:
-    // LogsManager& _logs;
-    // TimeManager& _timeMgr;
-    // ErrorManager& _errorMgr;
 };
