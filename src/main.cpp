@@ -1,72 +1,123 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include "Network/WiFiManager.h"
-#include "Utilities/TimeManager.h"
+#include <SPI.h>
+#include "Network/LoRaRadio.h"
 
-// ---- Your WiFi credentials ----
-const char* ssid = "khaled";
-const char* password = "khaled000";
+// LoRa pins
+#define LORA_NSS   5
+#define LORA_DIO0  35
+#define LORA_RESET 27
 
-// ---- WiFi Manager ----
-WiFiManager wifiMgr;
+// SPI instance
+SPIClass loraSPI(VSPI);
 
-// ---- I2C pins for RTC ----
-#define SDA_PIN 18
-#define SCL_PIN 19
+// LoRaRadio instance
+LoRaRadio lora(LORA_NSS, LORA_DIO0, LORA_RESET, loraSPI);
 
-// ---- Time Manager ----
-// Parameters: NTP server, UTC offset (3600 = 1h), NTP interval (60000ms), sync interval (10000ms),
-// WiFi manager pointer, useRTC = true, SDA/SCL pins
+// Packet received callback
+void onPacketReceived() {
+    String packet;
+    int bytesRead = lora.readData(packet);
+    if (bytesRead > 0) {
+        Serial.print("Received: "); Serial.println(packet);
+        Serial.print("RSSI: "); Serial.print(lora.getRSSI());
+        Serial.print(" | SNR: "); Serial.println(lora.getSNR(), 2);
+    }
+}
 
-TimeManager* timeMgr;
 void setup() {
-  Serial.begin(115200);
-  Serial.println("\n--- TimeManager Test ---");
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("---- LoRa Receiver ----");
 
-  // init WiFi
-  wifiMgr.init(ssid, password);
+    // Initialize SPI
+    loraSPI.begin(18, 19, 23, LORA_NSS); // SCK, MISO, MOSI, CS
 
-  // init time manager (starts NTP + RTC)
-  timeMgr = new TimeManager("pool.ntp.org", 3600, 60000, 10000, &wifiMgr, true, SDA_PIN, SCL_PIN);
-  timeMgr->begin();
+    // Initialize LoRa radio
+    if (!lora.init(868.0, 125000, 7, 5, 0)) { // freq, BW, SF, CR, gain
+        Serial.println("LoRa init failed!");
+        while(1);
+    }
+    Serial.println("LoRa initialized successfully.");
 
-  // test changing sync interval
-  Serial.println("Changing sync interval to 5 seconds...");
-  timeMgr->setSyncInterval(5000);
+    // Set LoRa to receive mode
+    lora.setReceiveMode(868.0);
 
-  // Force a sync immediately
-  Serial.println("Forcing NTP sync now...");
-  timeMgr->forceSync();
+    // Set callbacks
+    lora.setPacketReceivedAction(onPacketReceived);
 }
 
 void loop() {
-  // // call update to perform periodic sync
-  timeMgr->update();
-
-  // test getTimestamp()
-  unsigned long ts = timeMgr->getTimestamp();
-  Serial.print("Timestamp: ");
-  Serial.println(ts);
-
-  // test getCurrentDateTime()
-  TimeManager::DateTimeInfo dt = timeMgr->getCurrentDateTime();
-  Serial.printf("Current DateTime: %04d-%02d-%02d %02d:%02d:%02d\n",
-                dt.year, dt.month, dt.day,
-                dt.hour, dt.minute, dt.second);
-
-  // test millisToPeriod()
-  String period = timeMgr->millisToPeriod(millis());
-  Serial.print("Millis since boot = ");
-  Serial.println(period);
-
-  // Wait 1 second
-  delay(1000);
-
-  // After a few loops, test forceSync again
-  static unsigned long lastForce = 0;
-  if (millis() - lastForce > 30000) { // every 30s
-    Serial.println("Forcing NTP sync again...");
-    timeMgr->forceSync();
-    lastForce = millis();
-  }
+    int rxState = lora.startReceive();
+    if (rxState != RADIOLIB_ERR_NONE && rxState != RADIOLIB_ERR_RX_TIMEOUT) {
+        Serial.print("Receive error, code: "); Serial.println(rxState);
+    }
+    delay(100);
 }
+
+
+
+
+#include <Arduino.h>
+#include <SPI.h>
+#include "Network/LoRaRadio.h"
+
+// LoRa pins
+#define LORA_NSS   5
+#define LORA_DIO0  35
+#define LORA_RESET 27
+
+// SPI instance
+SPIClass loraSPI(VSPI);
+
+// LoRaRadio instance
+LoRaRadio lora(LORA_NSS, LORA_DIO0, LORA_RESET, loraSPI);
+
+// Test message
+const char* testMsg = "Hello LoRa!";
+
+// Packet sent callback
+void onPacketSent() {
+    Serial.println("Packet successfully sent (callback).");
+}
+
+// void setup() {
+//     Serial.begin(115200);
+//     delay(1000);
+//     Serial.println("---- LoRa Sender ----");
+
+//     // Initialize SPI
+//     loraSPI.begin(18, 19, 23, LORA_NSS);
+
+//     // Initialize LoRa radio
+//     if (!lora.init(868.0, 125000, 7, 5, 0)) {
+//         Serial.println("LoRa init failed!");
+//         while(1);
+//     }
+//     Serial.println("LoRa initialized successfully.");
+
+//     // Set callbacks
+//     lora.setPacketSentAction(onPacketSent);
+
+//     // Send a test message
+//     int txState = lora.transmitData(testMsg);
+//     if (txState == RADIOLIB_ERR_NONE) {
+//         Serial.println("Test message transmitted.");
+//     } else {
+//         Serial.print("Transmit error, code: "); Serial.println(txState);
+//     }
+// }
+
+// void loop() {
+//     // Can send periodically
+//     static unsigned long lastSend = 0;
+//     if (millis() - lastSend > 5000) { // every 5 seconds
+//         int txState = lora.transmitData(testMsg);
+//         if (txState == RADIOLIB_ERR_NONE) {
+//             Serial.println("Message transmitted.");
+//         } else {
+//             Serial.print("Transmit error, code: "); Serial.println(txState);
+//         }
+//         lastSend = millis();
+//     }
+//     delay(100);
+// }
